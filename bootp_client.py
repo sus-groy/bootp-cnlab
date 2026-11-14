@@ -214,25 +214,25 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  Standard mode (with real MAC address):
-    sudo python3 bootp_client.py
+  Default mode (High ports 6868/6767, no sudo required):
+    python3 bootp_client.py
+    python3 bootp_client.py --mac aa:bb:cc:dd:ee:01
+    python3 bootp_client.py --server-ip 192.168.1.100
 
-  Specify custom/mock MAC:
-    python3 bootp_client.py --dev --mac aa:bb:cc:dd:ee:01
+  Standard BOOTP mode (Ports 68/67, requires sudo):
+    sudo python3 bootp_client.py --standard-ports
 
   Apply IP to interface for pinging and ping target:
     sudo python3 bootp_client.py --apply-ip --ping 192.168.1.151
-
-  Development loopback mode without sudo:
-    python3 bootp_client.py --dev
         """,
     )
     parser.add_argument("--mac", default=None, help="Hardware MAC address (default: auto-detected host MAC)")
     parser.add_argument("--interface", default=None, help="Network interface name (e.g. eth0, wlo1, en0)")
-    parser.add_argument("--port", type=int, default=68, help="Client listening UDP port (default: 68)")
-    parser.add_argument("--server-port", type=int, default=67, help="Server destination UDP port (default: 67)")
+    parser.add_argument("--port", type=int, default=6868, help="Client listening UDP port (default: 6868; 68 when --standard-ports is used)")
+    parser.add_argument("--server-port", type=int, default=6767, help="Server destination UDP port (default: 6767; 67 when --standard-ports is used)")
     parser.add_argument("--server-ip", default="255.255.255.255", help="Target server / broadcast IP (default: 255.255.255.255)")
-    parser.add_argument("--dev", action="store_true", help="Quick flag: use unprivileged ports on localhost (client: 6868, server: 6767, server-ip: 127.0.0.1)")
+    parser.add_argument("--standard-ports", action="store_true", help="Use standard BOOTP ports (client: 68, server: 67). Requires root/sudo.")
+    parser.add_argument("--dev", action="store_true", help="Quick flag: use localhost 127.0.0.1 for server-ip")
     parser.add_argument("--unicast", action="store_true", help="Request unicast reply (sets flags=0x0000 instead of broadcast 0x8000)")
     parser.add_argument("--apply-ip", action="store_true", help="Apply allotted IP to interface using OS command (enables ICMP ping from other devices)")
     parser.add_argument("--ping", dest="ping_ip", default=None, help="Target IP address to ping after receiving lease")
@@ -240,6 +240,14 @@ Examples:
     parser.add_argument("--retries", type=int, default=3, help="Max retry attempts (default: 3)")
 
     args = parser.parse_args()
+
+    # Apply standard-ports if requested and user didn't explicitly override port/server-port
+    if args.standard_ports:
+        # If user left them at defaults, shift to standard ports
+        if args.port == 6868:
+            args.port = 68
+        if args.server_port == 6767:
+            args.server_port = 67
 
     # Resolve MAC address
     if not args.mac:
@@ -249,8 +257,6 @@ Examples:
         print(f"[*] Using user-supplied MAC: {args.mac}")
 
     if args.dev:
-        args.port = 6868
-        args.server_port = 6767
         if args.server_ip == "255.255.255.255":
             args.server_ip = "127.0.0.1"
 
